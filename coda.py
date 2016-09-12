@@ -28,7 +28,7 @@ class CompositionalTransform:
     """The standard Euclidean n-dimensional basis does not provide an orthonormal basis in the compositional space.
     Because of this, the proper statistical space of compositional data is the (n-1) simplex. However, 
     compositional transformations map the composition from the (n-1) simplex to the (n-1) Euclidean space allowing the 
-    use of standard multivariate statistical techniques."""
+    use of standard multivariate statistical techniques. Only alr so far."""
     
     # additive log-ratio transform
     def alr(compositional_data,rm_index=None):
