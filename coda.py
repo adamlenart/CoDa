@@ -28,30 +28,35 @@ class CompositionalData:
             self.__values.columns = ["p{num}".format(num=number) for number in range(1,self.__values.shape[1]+1)]
         self.total = np.sum(self.__values,axis=1)
      
-    def close(self):
-        """Closure operation rescales the compositions to have a unit sum."""
-        return self.__values.div(self.total,axis=0) # divide row-wise
+    def close(self,total=1):
+        """Closure operation rescales the compositions to a total (default total = 1)."""
+        return total*self.__values.div(self.total,axis=0) # divide row-wise
     
-    def power(self,power):
+    def power(self,power,total=1):
         """Powering raises the composition to power elementwise and then closes it."""
         powered = self.__values.pow(other=power)
-        return powered.div(np.sum(powered,axis=1),axis=0)
+        return total*powered.div(np.sum(powered,axis=1),axis=0)
     
-    def perturb(self,other_composition):
+    def perturb(self,other_composition,total=1):
         """Perturbation multiplies the composition with an other composition elementwise and closes it."""
         if type(other_composition) is not CompositionalData:
             raise CompositionalDataException(other_composition)
-        multiplied = self.__values.mul(other_composition.get_values())
-        return multiplied.div(np.sum(multiplied,axis=1),axis=0)
+        multiplied = self.__values.mul(other_composition.values)
+        return total*multiplied.div(np.sum(multiplied,axis=1),axis=0)
     
+    @property
+    def values(self):
+        """Returns the composition(s) as a Pandas data frame."""
+        return self.__values
+    
+    #operator overloads for simpler getting and addition
     def __getitem__(self,indices):
         """Returns entries indexed by a 2-tuple using standard Python notation (Pandas DataFrame.ix method)"""
         row,column = indices
         return self.__values.ix[row,column]
     
-    def get_values(self):
-        """Returns the composition(s) as a Pandas data frame."""
-        return self.__values
+    def __add__(self,other_composition):
+        return self.perturb(other_composition)
     
 class CompositionalTransform:
     """Compositional transform class which operates on compositional data.
@@ -64,21 +69,31 @@ class CompositionalTransform:
     
     The additive log-ratio transforms the (n-1) simplex into the (n-1) dimensional Euclidean space. Note that it does not
     provide an orthonormal basis."""
-    
+   
+ 
     # additive log-ratio transform
     def alr(compositional_data,divisor=None):
         """Returns the alr transformed coordinates by leaving divisor out and dividing by it."""
         if type(compositional_data) is not CompositionalData:
             raise CompositionalDataException(compositional_data)
         if divisor is None:
-            divisor = compositional_data.get_values().columns[-1] 
-        divisor_part = compositional_data.get_values().loc[:,divisor]
-        return np.log(compositional_data.get_values().drop(divisor,axis=1).div(divisor_part,axis=0))
+            divisor = compositional_data.values.columns[-1] 
+        divisor_part = compositional_data.values.loc[:,divisor]
+        return np.log(compositional_data.values.drop(divisor,axis=1).div(divisor_part,axis=0))
+    
+    # centered log-ratio transform
+    def clr(compositional_data):
+        """Returns the clr transformed coordinates."""
+        if type(compositional_data) is not CompositionalData:
+            raise CompositionalDataException(compositional_data)
+        # the geometric mean acts as the center of the composition    
+        geom_mean = np.power(np.prod(compositional_data.values,axis=1),1/len(compositional_data.values.columns))
+        return np.log(compositional_data.values.div(geom_mean,axis=0))
 
 class InverseCompositionalTransform:
     """Inverse compositional transform class which transforms the real coordinates back to the simplex."""
     
-    def inv_alr(transformed_data,column_names=None):
+    def alr(transformed_data,column_names=None,total=1):
         """Returns the simplicial values from the alr coordinates."""
         # if no column_names are given, assume the last column was involved in the alr-transform and name it p#last_column
         if column_names is None:
@@ -91,5 +106,11 @@ class InverseCompositionalTransform:
             index,column_name = in_alr[0]
         # insert zeros for the column that was left out of the alr transform and exponentiate 
         transformed_data.insert(index,column_name,np.zeros(len(transformed_data.index)))
-        return CompositionalData(np.exp(transformed_data)).close()
+        return CompositionalData(np.exp(transformed_data)).close(total)
+    
+    def clr(transformed_data,total=1):
+        """Returns the simplicial values from the clr coordinates."""
+        return CompositionalData(np.exp(transformed_data)).close(total)
+      
+
       
